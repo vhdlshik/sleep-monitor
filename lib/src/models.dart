@@ -3,11 +3,12 @@ library;
 
 /// User-adjustable monitoring settings.
 ///
-/// All dB values are relative to the measured background noise of the room,
-/// so they work the same on phones with different microphone sensitivity.
+/// [thresholdDb] is an absolute sound level on the app's scale, where 0 dB is
+/// a whisper (see `soundDb`). [burstDb] is relative to the room's measured
+/// background, since a burst is a sudden jump.
 class MonitorSettings {
   const MonitorSettings({
-    this.thresholdDb = 1.0,
+    this.thresholdDb = 20.0,
     this.burstDb = 10.0,
     this.budgetPerHour = const Duration(minutes: 5),
     this.burstCapPerHour = const Duration(minutes: 15),
@@ -17,7 +18,8 @@ class MonitorSettings {
     this.retention = const Duration(days: 7),
   });
 
-  /// Sound this many dB above background starts a regular recording.
+  /// Sound at or above this level (0 dB is a whisper) starts a regular
+  /// recording.
   final double thresholdDb;
 
   /// A sudden jump this many dB above background counts as a burst
@@ -76,7 +78,8 @@ class Epoch {
   /// Background level at the time.
   final double floorDb;
 
-  /// Share of the epoch above the recording threshold (0..1).
+  /// Share of the epoch with activity above background (0..1), see
+  /// `NightAnalyzer.activityDb`.
   final double activeFraction;
 
   /// Bursts that started in this epoch.

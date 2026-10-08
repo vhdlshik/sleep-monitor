@@ -21,6 +21,11 @@ class NightAnalyzer {
     : _detector = BurstDetector(burstDb: settings.burstDb),
       policy = RecordingPolicy(settings);
 
+  /// Sound this far above background counts as activity (movement,
+  /// rustling) for sleep staging. Separate from the recording threshold,
+  /// which is an absolute level and would miss quiet movement.
+  static const activityDb = 3.0;
+
   final MonitorSettings settings;
   final Duration epochLength;
   final NoiseFloor _floor = NoiseFloor();
@@ -41,14 +46,15 @@ class NightAnalyzer {
   FrameResult process(DateTime t, double levelDb) {
     // Compare against the floor *before* this frame nudges it.
     final floor = _floor.value == minDb ? levelDb : _floor.value;
-    final loud = levelDb >= floor + settings.thresholdDb;
+    final loud = soundDb(levelDb) >= settings.thresholdDb;
     final burst = _detector.update(t, levelDb, floor);
     final action = policy.update(t, loud: loud, burstOnset: burst.onset);
     _floor.update(levelDb);
 
     final event = burst.finished;
     if (event != null) events.add(event);
-    _accumulate(t, levelDb, floor, loud, burst.onset);
+    final active = levelDb >= floor + activityDb;
+    _accumulate(t, levelDb, floor, active, burst.onset);
 
     return FrameResult(action: action, floorDb: floor, event: event);
   }
@@ -60,7 +66,7 @@ class NightAnalyzer {
     DateTime t,
     double levelDb,
     double floor,
-    bool loud,
+    bool active,
     bool onset,
   ) {
     final start = _epochStart;
@@ -74,7 +80,7 @@ class NightAnalyzer {
     if (levelDb > _max) _max = levelDb;
     _floorSum += floor;
     _frames++;
-    if (loud) _activeFrames++;
+    if (active) _activeFrames++;
     if (onset) _bursts++;
   }
 
