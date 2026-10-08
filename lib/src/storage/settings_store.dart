@@ -4,7 +4,9 @@ import '../models.dart';
 
 /// Persists the user-adjustable parts of [MonitorSettings].
 class SettingsStore {
-  static const _threshold = 'thresholdDb';
+  // Renamed when the threshold changed from "above background" to an
+  // absolute level, so old relative values aren't read with the new meaning.
+  static const _threshold = 'thresholdSoundDb';
   static const _burst = 'burstDb';
 
   Future<MonitorSettings> load() async {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../analysis/level.dart';
 import '../models.dart';
 import '../monitor/night_monitor.dart';
 import '../storage/session_store.dart';
@@ -87,16 +88,16 @@ class _HomePageState extends State<HomePage> {
           const SizedBox(height: 16),
           if (running) _LivePanel(monitor: widget.monitor),
           _SettingSlider(
-            label: 'Recording threshold above background',
+            label: 'Recording threshold (0 dB = whisper)',
             value: _settings.thresholdDb,
-            min: 0.5,
-            max: 20,
+            min: 0,
+            max: 60,
             enabled: !running,
             onChanged: (v) =>
                 _updateSettings(_settings.copyWith(thresholdDb: v)),
           ),
           _SettingSlider(
-            label: 'Sudden sound (snore) sensitivity',
+            label: 'Sudden sound (snore): jump above background',
             value: _settings.burstDb,
             min: 4,
             max: 30,
@@ -138,17 +139,15 @@ class _LivePanel extends StatelessWidget {
       valueListenable: monitor.live,
       builder: (context, s, _) {
         if (s == null) return const SizedBox.shrink();
-        final above = s.levelDb - s.floorDb;
+        String db(double dbfs) => '${soundDb(dbfs).toStringAsFixed(1)} dB';
         return Card(
           child: Padding(
             padding: const EdgeInsets.all(12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Now: ${above >= 0 ? '+' : ''}${above.toStringAsFixed(1)} dB over background',
-                ),
-                Text('Background: ${s.floorDb.toStringAsFixed(1)} dBFS'),
+                Text('Now: ${db(s.levelDb)} (0 dB = whisper)'),
+                Text('Background: ${db(s.floorDb)}'),
                 Text(s.recording ? 'Recording…' : 'Listening'),
                 Text('${s.events} sudden sounds · ${s.clips} recordings'),
               ],

@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -8,6 +9,7 @@ import 'package:sleep_monitor/src/analysis/night_summary.dart';
 import 'package:sleep_monitor/src/analysis/sleep_stager.dart';
 import 'package:sleep_monitor/src/analysis/snore_classifier.dart';
 import 'package:sleep_monitor/src/models.dart';
+import 'package:sleep_monitor/src/recording/recording_policy.dart';
 
 const frame = Duration(milliseconds: 100);
 final t0 = DateTime(2026, 10, 3, 0, 0);
@@ -36,6 +38,44 @@ void main() {
       f.update(-20);
     }
     expect(f.value, lessThan(-59));
+  });
+
+  test('noise floor skips startup zeros and settles on the room fast', () {
+    final f = NoiseFloor();
+    for (var i = 0; i < 5; i++) {
+      f.update(minDb);
+    }
+    // A low outlier first, then the real room.
+    f.update(-75);
+    for (var i = 0; i < 50; i++) {
+      f.update(-60);
+    }
+    expect(f.value, closeTo(-60, 0.5));
+  });
+
+  test('sound scale puts a whisper (30 dB SPL) at 0 dB', () {
+    // 90 dB SPL reads RMS 2500 on Android's voice-recognition mic.
+    final dbfs90 = 20 * math.log(2500 / 32768) / math.ln10;
+    expect(soundDb(dbfs90 - 60), closeTo(0, 0.1));
+  });
+
+  test('threshold is an absolute level, not above background', () {
+    final a = NightAnalyzer(const MonitorSettings(thresholdDb: 20));
+    var t = t0;
+    PolicyAction step(double sound) {
+      t = t.add(frame);
+      return a.process(t, sound - dbfsToSoundDb).action;
+    }
+
+    // Startup zeros, then a quiet room at 5 dB: nothing is recorded.
+    for (var i = 0; i < 5; i++) {
+      step(minDb + dbfsToSoundDb);
+    }
+    for (var i = 0; i < 600; i++) {
+      expect(step(5), PolicyAction.none);
+    }
+    // Steady 25 dB sound starts a recording.
+    expect(step(25), PolicyAction.start);
   });
 
   test('burst detector reports a sudden short sound, not a slow rise', () {
@@ -95,7 +135,8 @@ void main() {
     final a = NightAnalyzer(const MonitorSettings());
     var starts = 0;
     for (var i = 0; i < 900; i++) {
-      final level = i == 400 ? -30.0 : -60.0;
+      // A quiet room (about 12 dB) with one loud burst.
+      final level = i == 400 ? -30.0 : -70.0;
       if (a.process(t0.add(frame * i), level).action.name == 'start') starts++;
     }
     a.finish();

@@ -127,6 +127,11 @@ class NightMonitor {
         autoGain: false,
         echoCancel: false,
         noiseSuppress: false,
+        // Android specifies this source's sensitivity, which is what makes
+        // the absolute level (see soundDb) meaningful across phones.
+        androidConfig: AndroidRecordConfig(
+          audioSource: AndroidAudioSource.voiceRecognition,
+        ),
       ),
     );
     _sub = stream.listen((chunk) {

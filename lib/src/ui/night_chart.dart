@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 
+import '../analysis/level.dart';
 import '../analysis/night_summary.dart';
 import '../analysis/sleep_stager.dart';
 
@@ -97,14 +98,11 @@ class _NightPainter extends CustomPainter {
       );
     }
 
-    // Sound level above background, 0..30 dB.
+    // Sound level, 0..60 dB where 0 dB is a whisper.
     final path = Path();
     for (var i = 0; i < epochs.length; i++) {
-      final above = (epochs[i].meanDb - epochs[i].floorDb).clamp(0.0, 30.0);
-      final p = Offset(
-        x(epochs[i].start),
-        levelTop + levelH * (1 - above / 30),
-      );
+      final db = soundDb(epochs[i].meanDb).clamp(0.0, 60.0);
+      final p = Offset(x(epochs[i].start), levelTop + levelH * (1 - db / 60));
       i == 0 ? path.moveTo(p.dx, p.dy) : path.lineTo(p.dx, p.dy);
     }
     canvas.drawPath(
