@@ -143,6 +143,37 @@ void main() {
     expect(a.epochs.length, 3);
     expect(a.epochs[1].bursts, 1);
     expect(starts, 1);
+    expect(a.levels!.peaks.length, 90);
+    expect(a.levels!.peaks[40], -30);
+    expect(a.levels!.peaks[41], -70);
+  });
+
+  test('every snore falls inside a recording', () {
+    final a = NightAnalyzer(const MonitorSettings());
+    final spans = <(DateTime, DateTime)>[];
+    DateTime? open;
+    final end = t0.add(const Duration(minutes: 10));
+    for (var t = t0; t.isBefore(end); t = t.add(frame)) {
+      final s = t.difference(t0).inMilliseconds;
+      // Quiet room, then a snore every 4 s (0.5 s long) for two minutes.
+      final snoring = s >= 120000 && s < 240000 && s % 4000 < 500;
+      final r = a.process(t, snoring ? -35.0 : -75.0);
+      if (r.action == PolicyAction.start) open = t;
+      if (r.action == PolicyAction.stop) {
+        spans.add((open!, t.add(frame)));
+        open = null;
+      }
+    }
+    classifySnores(a.events);
+    final snores = a.events.where((e) => e.type == SoundEventType.snore);
+    expect(snores.length, greaterThan(20));
+    for (final e in snores) {
+      expect(
+        spans.any((c) => !e.start.isBefore(c.$1) && e.start.isBefore(c.$2)),
+        isTrue,
+        reason: 'snore at ${e.start} not recorded',
+      );
+    }
   });
 
   group('sleep stager', () {

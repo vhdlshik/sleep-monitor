@@ -63,6 +63,9 @@ class NightMonitor {
 
   bool get isRunning => _night != null;
 
+  /// Id of the night being monitored right now.
+  String? get currentId => _night?.id;
+
   static void initService() {
     FlutterForegroundTask.init(
       androidNotificationOptions: AndroidNotificationOptions(
@@ -227,7 +230,9 @@ class NightMonitor {
     final night = _night!;
     final pre = _preRoll!.drain();
     final start = t.subtract(frame * pre.length);
-    final file = 'clip-${DateFormat('HHmmss').format(start)}-${kind.name}.wav';
+    // Milliseconds keep two clips starting in the same second apart.
+    final file =
+        'clip-${DateFormat('HHmmss-SSS').format(start)}-${kind.name}.wav';
     final writer = await WavWriter.open(
       store.clipPath(night.id, file),
       sampleRate: sampleRate,
@@ -261,6 +266,7 @@ class NightMonitor {
     night.events
       ..clear()
       ..addAll(analyzer.events);
+    night.levels = analyzer.levels;
     await store.save(night);
   }
 }

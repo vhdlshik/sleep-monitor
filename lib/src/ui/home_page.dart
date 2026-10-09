@@ -34,6 +34,9 @@ class _HomePageState extends State<HomePage> {
     final settings = await _settingsStore.load();
     await widget.store.purgeOlderThan(settings.retention);
     final nights = await widget.store.list();
+    for (final n in nights) {
+      if (n.id != widget.monitor.currentId) await widget.store.recoverClips(n);
+    }
     if (!mounted) return;
     setState(() {
       _settings = settings;
