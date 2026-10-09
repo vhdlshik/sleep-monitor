@@ -35,6 +35,9 @@ class NightAnalyzer {
   final List<Epoch> epochs = [];
   final List<SoundEvent> events = [];
 
+  /// Peak level per second, for the zoomable sound chart.
+  LevelTrack? levels;
+
   DateTime? _epochStart;
   double _sumPower = 0;
   double _max = minDb;
@@ -55,12 +58,23 @@ class NightAnalyzer {
     if (event != null) events.add(event);
     final active = levelDb >= floor + activityDb;
     _accumulate(t, levelDb, floor, active, burst.onset);
+    _track(t, levelDb);
 
     return FrameResult(action: action, floorDb: floor, event: event);
   }
 
   /// Closes the last, partial epoch.
   void finish() => _closeEpoch();
+
+  void _track(DateTime t, double levelDb) {
+    final track = levels ??= LevelTrack(start: t);
+    final i =
+        t.difference(track.start).inMilliseconds ~/ track.step.inMilliseconds;
+    while (track.peaks.length <= i) {
+      track.peaks.add(minDb);
+    }
+    if (levelDb > track.peaks[i]) track.peaks[i] = levelDb;
+  }
 
   void _accumulate(
     DateTime t,

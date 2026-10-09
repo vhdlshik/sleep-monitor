@@ -135,6 +135,38 @@ class SoundEvent {
   );
 }
 
+/// The sound level through the night at a fixed [step]: the loudest
+/// 100 ms frame of each step, in dBFS. Detailed enough to zoom in on a
+/// single snore, small enough to keep for every night.
+class LevelTrack {
+  LevelTrack({
+    required this.start,
+    this.step = const Duration(seconds: 1),
+    List<double>? peaks,
+  }) : peaks = peaks ?? [];
+
+  final DateTime start;
+  final Duration step;
+  final List<double> peaks;
+
+  DateTime timeOf(int i) => start.add(step * i);
+
+  DateTime get end => timeOf(peaks.length);
+
+  Map<String, Object?> toJson() => {
+    't': start.millisecondsSinceEpoch,
+    'step': step.inMilliseconds,
+    // Tenths of a dB as integers keep a night's track around 150 KB.
+    'v': [for (final p in peaks) (p * 10).round()],
+  };
+
+  factory LevelTrack.fromJson(Map<String, Object?> j) => LevelTrack(
+    start: DateTime.fromMillisecondsSinceEpoch(j['t'] as int),
+    step: Duration(milliseconds: j['step'] as int),
+    peaks: [for (final v in j['v'] as List) (v as num) / 10],
+  );
+}
+
 /// Why a clip was recorded. A clip that started on the threshold but was
 /// extended by a burst stays [threshold].
 enum ClipKind { threshold, burst }
@@ -180,6 +212,7 @@ class NightSession {
     List<Epoch>? epochs,
     List<SoundEvent>? events,
     List<Clip>? clips,
+    this.levels,
   }) : epochs = epochs ?? [],
        events = events ?? [],
        clips = clips ?? [];
@@ -191,8 +224,19 @@ class NightSession {
   final List<SoundEvent> events;
   final List<Clip> clips;
 
+  /// Per-second levels. Null for nights recorded before it was added.
+  LevelTrack? levels;
+
   List<SoundEvent> get snores =>
       events.where((e) => e.type == SoundEventType.snore).toList();
+
+  /// The recording that contains [t], if any.
+  Clip? clipAt(DateTime t) {
+    for (final c in clips) {
+      if (!t.isBefore(c.start) && t.isBefore(c.end)) return c;
+    }
+    return null;
+  }
 
   Map<String, Object?> toJson() => {
     'version': 1,
@@ -202,6 +246,7 @@ class NightSession {
     'epochs': [for (final e in epochs) e.toJson()],
     'events': [for (final e in events) e.toJson()],
     'clips': [for (final c in clips) c.toJson()],
+    if (levels != null) 'levels': levels!.toJson(),
   };
 
   factory NightSession.fromJson(Map<String, Object?> j) => NightSession(
@@ -220,6 +265,9 @@ class NightSession {
     clips: [
       for (final c in j['clips'] as List) Clip.fromJson((c as Map).cast()),
     ],
+    levels: j['levels'] == null
+        ? null
+        : LevelTrack.fromJson((j['levels'] as Map).cast()),
   );
 }
 

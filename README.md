@@ -33,7 +33,7 @@ with estimated sleep phases and snoring times.
 | `lib/src/recording/` | Recording policy (threshold, hourly cap, bursts) and WAV writing |
 | `lib/src/monitor/night_monitor.dart` | Microphone stream, foreground service, clip files |
 | `lib/src/storage/` | Nights as JSON + WAV per folder, 7-day cleanup, settings |
-| `lib/src/ui/` | Home screen, morning view and chart |
+| `lib/src/ui/` | Home screen, morning view, hypnogram and zoomable sound chart |
 
 The analysis and recording rules are plain Dart with no I/O, covered by
 `flutter test`.

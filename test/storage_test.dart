@@ -81,6 +81,74 @@ void main() {
     expect(b.getUint32(24, Endian.little), 16000);
   });
 
+  test('per-second levels round-trip; old nights load without them', () async {
+    final store = SessionStore(tmp);
+    final night = NightSession(
+      id: 'n2',
+      start: DateTime(2026, 10, 2, 23),
+      levels: LevelTrack(
+        start: DateTime(2026, 10, 2, 23),
+        peaks: [-60, -55.25, -30],
+      ),
+    );
+    await store.save(night);
+    final loaded = (await store.load('n2'))!;
+    expect(loaded.levels!.peaks, [-60, -55.3, -30]);
+    expect(loaded.levels!.end, DateTime(2026, 10, 2, 23, 0, 3));
+
+    final json = night.toJson()..remove('levels');
+    expect(NightSession.fromJson(json).levels, isNull);
+  });
+
+  test('an unfinished clip is repaired and added back to its night', () async {
+    final store = SessionStore(tmp);
+    final night = NightSession(id: 'n3', start: DateTime(2026, 10, 2, 23, 30));
+    await store.save(night);
+    // Killed mid-clip: the header still says no data.
+    final w = await WavWriter.open(
+      store.clipPath('n3', 'clip-021500-250-burst.wav'),
+      sampleRate: 16000,
+    );
+    await w.add(Uint8List(64000));
+    // A finished clip from before the night started (pre-roll) stays as is.
+    final ok = await WavWriter.open(
+      store.clipPath('n3', 'clip-232958-burst.wav'),
+      sampleRate: 16000,
+    );
+    await ok.add(Uint8List(32000));
+    await ok.close();
+
+    expect(await store.recoverClips(night), isTrue);
+    expect(night.clips.map((c) => c.start), [
+      DateTime(2026, 10, 2, 23, 29, 58),
+      DateTime(2026, 10, 3, 2, 15, 0, 250),
+    ]);
+    expect(night.clips.last.duration, const Duration(seconds: 2));
+    expect(night.clips.last.kind, ClipKind.burst);
+    final bytes = await File(store.clipPath('n3', 'clip-021500-250-burst.wav'))
+        .readAsBytes();
+    expect(ByteData.sublistView(bytes).getUint32(40, Endian.little), 64000);
+    expect((await store.load('n3'))!.clips.length, 2);
+    expect(await store.recoverClips(night), isFalse);
+  });
+
+  test('clipAt finds the recording around a moment', () {
+    final night = NightSession(
+      id: 'n4',
+      start: DateTime(2026, 10, 2, 23),
+      clips: [
+        Clip(
+          file: 'a.wav',
+          start: DateTime(2026, 10, 3, 2),
+          end: DateTime(2026, 10, 3, 2, 0, 20),
+          kind: ClipKind.burst,
+        ),
+      ],
+    );
+    expect(night.clipAt(DateTime(2026, 10, 3, 2, 0, 5))?.file, 'a.wav');
+    expect(night.clipAt(DateTime(2026, 10, 3, 2, 0, 20)), isNull);
+  });
+
   test('pre-roll keeps only the newest frames', () {
     final p = PreRollBuffer(3);
     for (var i = 0; i < 5; i++) {
